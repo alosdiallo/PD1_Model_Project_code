@@ -1,0 +1,878 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+```{r}
+library(neuralnet)
+library(readxl)
+library(grid)
+library(corrplot)
+#Loading libraries
+library(caret)
+library(e1071)
+library(ROCR)
+library(ggplot2)
+library(GGally)
+library(PerformanceAnalytics)
+library(factoextra)
+library(corrplot)
+library(Rtsne)
+library(FactoMineR)
+library(ggplot2)
+library(factoextra)
+library(survminer)
+library(ggcorrplot)
+library(readr)
+library(circlize)
+library(readxl)
+library(stringr)
+library(reshape)
+library(psych)
+library(ComplexHeatmap)
+library(ggpubr)
+library(readr)
+library(gridExtra)
+library(cowplot)
+library(MASS)
+library(fitdistrplus)
+#BiocManager::install("preprocessCore")
+library(preprocessCore)
+library(MASS)
+library(class)
+library(ggplot2)
+library(reshape2)
+library(ROCR)
+library(e1071)
+library(GGally)
+```
+Plot NN function
+```{r}
+#From Frauke Guenther
+#https://stackoverflow.com/questions/11866740/having-problems-saving-a-neural-net-plot-using-neuralnet-package-r
+
+plot.nn <-
+function (x, rep = NULL, x.entry = NULL, x.out = NULL, radius = 0.15, 
+    arrow.length = 0.2, intercept = TRUE, intercept.factor = 0.4, 
+    information = TRUE, information.pos = 0.1, col.entry.synapse = "black", 
+    col.entry = "black", col.hidden = "black", col.hidden.synapse = "black", 
+    col.out = "black", col.out.synapse = "black", col.intercept = "blue", 
+    fontsize = 12, dimension = 6, show.weights = TRUE, file = NULL, 
+    ...) 
+{
+    net <- x
+    if (is.null(net$weights)) 
+        stop("weights were not calculated")
+    if (!is.null(file) && !is.character(file)) 
+        stop("'file' must be a string")
+    if (is.null(rep)) {
+        for (i in 1:length(net$weights)) {
+            if (!is.null(file)) 
+                file.rep <- paste(file, ".", i, sep = "")
+            else file.rep <- NULL
+            #dev.new()
+            plot.nn(net, rep = i, x.entry, x.out, radius, arrow.length, 
+                intercept, intercept.factor, information, information.pos, 
+                col.entry.synapse, col.entry, col.hidden, col.hidden.synapse, 
+                col.out, col.out.synapse, col.intercept, fontsize, 
+                dimension, show.weights, file.rep, ...)
+        }
+    }
+    else {
+        if (is.character(file) && file.exists(file)) 
+            stop(sprintf("%s already exists", sQuote(file)))
+        result.matrix <- t(net$result.matrix)
+        if (rep == "best") 
+            rep <- as.integer(which.min(result.matrix[, "error"]))
+        if (rep > length(net$weights)) 
+            stop("'rep' does not exist")
+        weights <- net$weights[[rep]]
+        if (is.null(x.entry)) 
+            x.entry <- 0.5 - (arrow.length/2) * length(weights)
+        if (is.null(x.out)) 
+            x.out <- 0.5 + (arrow.length/2) * length(weights)
+        width <- max(x.out - x.entry + 0.2, 0.8) * 8
+        radius <- radius/dimension
+        entry.label <- net$model.list$variables
+        out.label <- net$model.list$response
+        neuron.count <- array(0, length(weights) + 1)
+        neuron.count[1] <- nrow(weights[[1]]) - 1
+        neuron.count[2] <- ncol(weights[[1]])
+        x.position <- array(0, length(weights) + 1)
+        x.position[1] <- x.entry
+        x.position[length(weights) + 1] <- x.out
+        if (length(weights) > 1) 
+            for (i in 2:length(weights)) {
+                neuron.count[i + 1] <- ncol(weights[[i]])
+                x.position[i] <- x.entry + (i - 1) * (x.out - 
+                  x.entry)/length(weights)
+            }
+        y.step <- 1/(neuron.count + 1)
+        y.position <- array(0, length(weights) + 1)
+        y.intercept <- 1 - 2 * radius
+        information.pos <- min(min(y.step) - 0.1, 0.2)
+        if (length(entry.label) != neuron.count[1]) {
+            if (length(entry.label) < neuron.count[1]) {
+                tmp <- NULL
+                for (i in 1:(neuron.count[1] - length(entry.label))) {
+                  tmp <- c(tmp, "no name")
+                }
+                entry.label <- c(entry.label, tmp)
+            }
+        }
+        if (length(out.label) != neuron.count[length(neuron.count)]) {
+            if (length(out.label) < neuron.count[length(neuron.count)]) {
+                tmp <- NULL
+                for (i in 1:(neuron.count[length(neuron.count)] - 
+                  length(out.label))) {
+                  tmp <- c(tmp, "no name")
+                }
+                out.label <- c(out.label, tmp)
+            }
+        }
+        grid.newpage()
+        pushViewport(viewport(name = "plot.area", width = unit(dimension, 
+            "inches"), height = unit(dimension, "inches")))
+        for (k in 1:length(weights)) {
+            for (i in 1:neuron.count[k]) {
+                y.position[k] <- y.position[k] + y.step[k]
+                y.tmp <- 0
+                for (j in 1:neuron.count[k + 1]) {
+                  y.tmp <- y.tmp + y.step[k + 1]
+                  result <- calculate.delta(c(x.position[k], 
+                    x.position[k + 1]), c(y.position[k], y.tmp), 
+                    radius)
+                  x <- c(x.position[k], x.position[k + 1] - result[1])
+                  y <- c(y.position[k], y.tmp + result[2])
+                  grid.lines(x = x, y = y, arrow = arrow(length = unit(0.15, 
+                    "cm"), type = "closed"), gp = gpar(fill = col.hidden.synapse, 
+                    col = col.hidden.synapse, ...))
+                  if (show.weights) 
+                    draw.text(label = weights[[k]][neuron.count[k] - 
+                      i + 2, neuron.count[k + 1] - j + 1], x = c(x.position[k], 
+                      x.position[k + 1]), y = c(y.position[k], 
+                      y.tmp), xy.null = 1.25 * result, color = col.hidden.synapse, 
+                      fontsize = fontsize - 2, ...)
+                }
+                if (k == 1) {
+                  grid.lines(x = c((x.position[1] - arrow.length), 
+                    x.position[1] - radius), y = y.position[k], 
+                    arrow = arrow(length = unit(0.15, "cm"), 
+                      type = "closed"), gp = gpar(fill = col.entry.synapse, 
+                      col = col.entry.synapse, ...))
+                  draw.text(label = entry.label[(neuron.count[1] + 
+                    1) - i], x = c((x.position - arrow.length), 
+                    x.position[1] - radius), y = c(y.position[k], 
+                    y.position[k]), xy.null = c(0, 0), color = col.entry.synapse, 
+                    fontsize = fontsize, ...)
+                  grid.circle(x = x.position[k], y = y.position[k], 
+                    r = radius, gp = gpar(fill = "white", col = col.entry, 
+                      ...))
+                }
+                else {
+                  grid.circle(x = x.position[k], y = y.position[k], 
+                    r = radius, gp = gpar(fill = "white", col = col.hidden, 
+                      ...))
+                }
+            }
+        }
+        out <- length(neuron.count)
+        for (i in 1:neuron.count[out]) {
+            y.position[out] <- y.position[out] + y.step[out]
+            grid.lines(x = c(x.position[out] + radius, x.position[out] + 
+                arrow.length), y = y.position[out], arrow = arrow(length = unit(0.15, 
+                "cm"), type = "closed"), gp = gpar(fill = col.out.synapse, 
+                col = col.out.synapse, ...))
+            draw.text(label = out.label[(neuron.count[out] + 
+                1) - i], x = c((x.position[out] + radius), x.position[out] + 
+                arrow.length), y = c(y.position[out], y.position[out]), 
+                xy.null = c(0, 0), color = col.out.synapse, fontsize = fontsize, 
+                ...)
+            grid.circle(x = x.position[out], y = y.position[out], 
+                r = radius, gp = gpar(fill = "white", col = col.out, 
+                  ...))
+        }
+        if (intercept) {
+            for (k in 1:length(weights)) {
+                y.tmp <- 0
+                x.intercept <- (x.position[k + 1] - x.position[k]) * 
+                  intercept.factor + x.position[k]
+                for (i in 1:neuron.count[k + 1]) {
+                  y.tmp <- y.tmp + y.step[k + 1]
+                  result <- calculate.delta(c(x.intercept, x.position[k + 
+                    1]), c(y.intercept, y.tmp), radius)
+                  x <- c(x.intercept, x.position[k + 1] - result[1])
+                  y <- c(y.intercept, y.tmp + result[2])
+                  grid.lines(x = x, y = y, arrow = arrow(length = unit(0.15, 
+                    "cm"), type = "closed"), gp = gpar(fill = col.intercept, 
+                    col = col.intercept, ...))
+                  xy.null <- cbind(x.position[k + 1] - x.intercept - 
+                    2 * result[1], -(y.tmp - y.intercept + 2 * 
+                    result[2]))
+                  if (show.weights) 
+                    draw.text(label = weights[[k]][1, neuron.count[k + 
+                      1] - i + 1], x = c(x.intercept, x.position[k + 
+                      1]), y = c(y.intercept, y.tmp), xy.null = xy.null, 
+                      color = col.intercept, alignment = c("right", 
+                        "bottom"), fontsize = fontsize - 2, ...)
+                }
+                grid.circle(x = x.intercept, y = y.intercept, 
+                  r = radius, gp = gpar(fill = "white", col = col.intercept, 
+                    ...))
+                grid.text(1, x = x.intercept, y = y.intercept, 
+                  gp = gpar(col = col.intercept, ...))
+            }
+        }
+        if (information) 
+            grid.text(paste("Error: ", round(result.matrix[rep, 
+                "error"], 6), "   Steps: ", result.matrix[rep, 
+                "steps"], sep = ""), x = 0.5, y = information.pos, 
+                just = "bottom", gp = gpar(fontsize = fontsize + 
+                  2, ...))
+        popViewport()
+        if (!is.null(file)) {
+            weight.plot <- recordPlot()
+            save(weight.plot, file = file)
+        }
+    }
+}
+calculate.delta <-
+function (x, y, r) 
+{
+    delta.x <- x[2] - x[1]
+    delta.y <- y[2] - y[1]
+    x.null <- r/sqrt(delta.x^2 + delta.y^2) * delta.x
+    if (y[1] < y[2]) 
+        y.null <- -sqrt(r^2 - x.null^2)
+    else if (y[1] > y[2]) 
+        y.null <- sqrt(r^2 - x.null^2)
+    else y.null <- 0
+    c(x.null, y.null)
+}
+draw.text <-
+function (label, x, y, xy.null = c(0, 0), color, alignment = c("left", 
+    "bottom"), ...) 
+{
+    x.label <- x[1] + xy.null[1]
+    y.label <- y[1] - xy.null[2]
+    x.delta <- x[2] - x[1]
+    y.delta <- y[2] - y[1]
+    angle = atan(y.delta/x.delta) * (180/pi)
+    if (angle < 0) 
+        angle <- angle + 0
+    else if (angle > 0) 
+        angle <- angle - 0
+    if (is.numeric(label)) 
+        label <- round(label, 5)
+    pushViewport(viewport(x = x.label, y = y.label, width = 0, 
+        height = , angle = angle, name = "vp1", just = alignment))
+    grid.text(label, x = 0, y = unit(0.75, "mm"), just = alignment, 
+        gp = gpar(col = color, ...))
+    popViewport()
+}
+
+
+```
+
+Metrics function
+```{r}
+summPreds <- function(inpPred,inpTruth,inpMetrNms=c("err","acc","sens","spec")) {
+  retVals <- numeric()
+  for ( metrTmp in inpMetrNms ) {
+    retVals[metrTmp] <- performance(prediction(inpPred,inpTruth),measure=metrTmp)@y.values[[1]][2]
+  }
+  retVals
+}
+```
+
+
+```{r}
+
+# model_test <- read_excel("F:/GS/MT/AIM3/model_test.xlsx", 
+#     col_types = c("text", "numeric", "numeric", 
+#         "numeric", "numeric", "numeric", 
+#         "numeric", "numeric"))
+model_test = NULL
+model_test <- read_excel("/Users/adiallo/Desktop/model/model_test.xlsx", 
+     col_types = c("text", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "text"))
+
+model_training_set = NULL
+model_training_set <- read_excel("/Users/adiallo/Desktop/model/model_training_set.xlsx", 
+     col_types = c("text", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "text"))
+
+model_training_set_3 = NULL
+model_training_set_3 <- read_excel("/Users/adiallo/Desktop/model/model_training_set_3.xlsx")
+
+```
+
+```{r}
+#model_training_set$CLASS = as.factor(model_training_set$CLASS)
+#model_test$Outcome = as.factor(model_test$Outcome)
+str(model_training_set)
+#model_training_set = as.matrix(model_training_set)
+model_training_set$CLASS = as.factor(model_training_set$CLASS)
+dim(model_training_set)
+
+
+
+# bTrain <- sample(rep(c(TRUE,FALSE),length.out=nrow(model_test))) 
+# Train <- model_test[bTrain,1:8]
+# Test <- model_test[-bTrain,1:8]
+Train = NULL
+Test = NULL
+bTrain <- sample(rep(c(TRUE,FALSE),length.out=nrow(model_training_set)),replace = TRUE) 
+Train <- model_training_set[bTrain,1:10]
+Test <- model_training_set[-bTrain,1:10]
+str(model_training_set)
+
+#head(model_test)
+DESeq_results_CD8_all <- read_excel("DESeq_results_all.xlsx", 
+     col_types = c("text", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric"))
+
+
+```
+
+
+
+
+```{r}
+
+nTries = 500
+holder = NULL
+Tholder = NULL
+for ( iTry in 1:nTries ) {
+    Train = NULL
+    Test = NULL
+    bTrain <- sample(rep(c(TRUE,FALSE),length.out=nrow(model_training_set)),replace = TRUE) 
+    Train <- model_training_set[bTrain,1:10]
+    Test <- model_training_set[-bTrain,1:10]
+    #str(model_training_set)
+    
+    nnRes = NULL
+    #The neural network
+    nnRes <- neuralnet(Train$CLASS ~ .,Train[,2:9],hidden=c(10,10,10,10,10,10,10,10,10,10,10,10),stepmax=1e6,err.fct="ce", algorithm = "rprop+", learningrate = 0.0001,linear.output=FALSE,threshold=0.001)
+    
+
+    
+    #nnRes$model.list
+    tmpXYZpred <- predict(nnRes,Test[,2:9])
+
+    #Determining if the data is a match
+    testTblTmp <- table(as.integer(Test$CLASS),tmpXYZpred[,1] < .05)
+    
+    #The training error
+    err=c(mean(nnRes$err.fct(nnRes$net.result[[1]][,1],nnRes$response)))
+    #err
+    Tholder[iTry] = err
+    errTmp <- 1 - sum(diag(testTblTmp))/sum(testTblTmp)
+    #print("errTmp: Test error")
+    holder[iTry] = errTmp
+
+    #Saving the results to a dataframe
+    results <- data.frame(actual = Test$CLASS, prediction = tmpXYZpred[,1] < 0.5)
+    #Boxplot showing the results by class
+    #boxplot(as.integer(Test$CLASS),tmpXYZpred[,1] < .05)
+
+    Vtest <- ifelse(tmpXYZpred[,1] > 0.5, "FALSE", "TRUE")
+    #Vtest
+}
+
+value = NULL
+df = NULL
+
+df <- data.frame(Train_Test=c("Test error","Traing Error"),value=c(Tholder,holder))
+
+p <- ggplot(df, aes(Train_Test, value,colour = Train_Test))
+#p + geom_jitter(shape=16, position=position_jitter(0.2))
+p + geom_boxplot() + geom_jitter()
+
+
+boxplot(holder,col = "red",border = "brown",horizontal = FALSE,notch = TRUE, names = "Neural Network",main = "Neural network training error for CD8 Δ PD-1")
+
+
+#Printing out the model
+png("test.png",width = 40,height = 40,units = "in",res= 120,pointsize = 12)
+print(plot.nn(nnRes))
+dev.off()
+boxplot(holder)
+```
+
+```{r}
+#prediction on the new dataset
+#old
+#tmpXYZpred <- predict(nnRes,Test[,2:7])
+#New
+tmpXYZpred <- predict(nnRes,Test[,2:9])
+
+#Determining if the data is a match
+testTblTmp <- table(as.integer(Test$CLASS),tmpXYZpred[,1] < .05)
+
+#The training error
+err=c(mean(nnRes$err.fct(nnRes$net.result[[1]][,1],nnRes$response)))
+err
+
+errTmp <- 1 - sum(diag(testTblTmp))/sum(testTblTmp)
+print("errTmp: Test error")
+errTmp
+
+#Plotting the network diagram
+
+
+#Saving the results to a dataframe
+results <- data.frame(actual = Test$CLASS, prediction = tmpXYZpred[,1] < 0.5)
+#Boxplot showing the results by class
+boxplot(as.integer(Test$CLASS),tmpXYZpred[,1] < .05)
+#plot(nnRes$net.result[[1]][,1],col=Train$Outcome)
+
+
+#table(nnRes$net.result[[1]][,1]>0.5,Train$Outcome)
+#table(nnRes$net.result[[1]][,1]>median(nnRes$net.result[[1]][,1]),Train$Outcome)
+#boxplot(nnRes$net.result[[1]][,1]~Train$Outcome)
+#results
+
+#Converting the probabilieis to the outcome scheme used
+Vtest <- ifelse(tmpXYZpred[,1] > 0.5, "FALSE", "TRUE")
+#Vtest
+
+#deviation=((actual-predicted)/actual)
+tmpXYZpred_all <- predict(nnRes,model_training_set[,2:9])
+#tmpXYZpred_all 
+
+tmpXYZpred_all_data <- predict(nnRes,DESeq_results_CD8_all[,2:9])
+
+with_prediction = cbind(DESeq_results_CD8_all,tmpXYZpred_all_data)
+head(with_prediction)
+write.table(with_prediction, "results.txt", append = FALSE, sep = "\t",
+            row.names = TRUE, col.names = TRUE)
+
+```
+
+I am using this to have more than 3 outcomes
+```{r}
+
+#model_training_set = as.matrix(model_training_set)
+model_training_set_3$CLASS = as.factor(model_training_set_3$CLASS)
+
+
+nTries = 1
+holder = NULL
+
+for ( iTry in 1:nTries ) {
+    Train = NULL
+    Test = NULL
+    bTrain <- sample(rep(c(TRUE,FALSE),length.out=nrow(model_training_set_3)),replace = TRUE) 
+    Train <- model_training_set_3[bTrain,1:10]
+    Test <- model_training_set_3[-bTrain,1:10]
+    
+    nnRes = NULL
+    nnRes <- neuralnet(Train$CLASS ~ .,Train[,2:9],hidden=c(100,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20),stepmax=1e6,err.fct="ce", algorithm = 'rprop+', learningrate = 0.000001,linear.output=FALSE,threshold=0.001)
+    
+
+    
+    #nnRes$model.list
+    tmpXYZpred <- predict(nnRes,Test[,2:9])
+
+    #Determining if the data is a match
+    testTblTmp <- table(as.integer(Test$CLASS),tmpXYZpred[,1] < .05)
+    
+    #The training error
+    err=c(mean(nnRes$err.fct(nnRes$net.result[[1]][,1],nnRes$response)))
+    #err
+    
+    errTmp <- 1 - sum(diag(testTblTmp))/sum(testTblTmp)
+    #print("errTmp: Test error")
+    holder[iTry] = errTmp
+
+    #Saving the results to a dataframe
+    results <- data.frame(actual = Test$CLASS, prediction = tmpXYZpred[,1] < 0.5)
+    #Boxplot showing the results by class
+    #boxplot(as.integer(Test$CLASS),tmpXYZpred[,1] < .05)
+
+    #Vtest <- ifelse(tmpXYZpred[,1] > 0.5, "FALSE", "TRUE",)
+    #Vtest
+}
+
+#Printing out the model
+
+boxplot(holder)
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+Training Set work March 20th
+
+```{r}
+
+model_training_set = NULL
+model_training_set <- read_excel("/Users/adiallo/Desktop/model/new_approach/training_data.xlsx")
+nTries = 60
+holder = NULL
+dim(model_training_set)
+
+str(model_training_set)
+#model_training_set = as.matrix(model_training_set)
+model_training_set$CLASS = as.factor(model_training_set$CLASS)
+#Train[,10] = as.numeric(unlist(Train[,10]))
+
+#for ( iTry in 1:nTries ) {
+    Train = NULL
+    Test = NULL
+    bTrain = NULL
+   # bTrain <- sample(rep(c(TRUE,FALSE),length.out=nrow(model_training_set)*.2)) 
+    bTrain = sample(1:nrow(model_training_set),round(0.1*nrow(model_training_set)))
+    Train <- model_training_set[bTrain,1:10]
+    Test <- model_training_set[-bTrain,1:10]
+    #str(model_training_set)
+    #Train[,2:9],hidden=c(10,10,10,10,10,10,10,10,10,10,10,10)
+    nnRes = NULL
+    #The neural network
+   nnRes <- neuralnet(Train$CLASS ~ .,Train[,2:9],hidden=c(3,3,3,3,3),stepmax=1e6,err.fct="ce", algorithm = "rprop+", learningrate = 0.0001,linear.output=FALSE,threshold=0.001,rep = 5)
+    
+
+    
+    #nnRes$model.list
+    tmpXYZpred <- predict(nnRes,Test[,2:9])
+
+    #Determining if the data is a match
+    testTblTmp <- table(as.integer(Test$CLASS),tmpXYZpred[,1] < .05)
+    
+    #The training error
+    err=c(mean(nnRes$err.fct(nnRes$net.result[[1]][,1],nnRes$response)))
+    #err
+    
+    errTmp <- 1 - sum(diag(testTblTmp))/sum(testTblTmp)
+    #print("errTmp: Test error")
+    holder[iTry] = errTmp
+
+    #Saving the results to a dataframe
+    results <- data.frame(actual = Test$CLASS, prediction = tmpXYZpred[,1] < 0.5)
+    #Boxplot showing the results by class
+    #boxplot(as.integer(Test$CLASS),tmpXYZpred[,1] < .05)
+
+    Vtest <- ifelse(tmpXYZpred[,1] > 0.5, "FALSE", "TRUE")
+    #Vtest
+#}
+
+#Printing out the model
+png("test2.png",width = 40,height = 40,units = "in",res= 120,pointsize = 12)
+print(plot.nn(nnRes))
+dev.off()
+boxplot(holder)
+
+DESeq_results_all_counts <- read_excel("F:/GS/MT/AIM3/model/DESeq_results_all_counts.xlsx")
+
+
+
+###################### New try
+
+
+```
+
+Preliminary stats
+```{r}
+induc <- read_excel("F:/GS/MT/AIM1/diff_expr/CreP_vs_creN_Inducible_PD1_deletion_top100genes.xlsx")
+
+
+#here we are computing PCA
+dim(DESeq_results_all_counts)
+prcompTmp <- prcomp(model_training_set_3[,11:29],center = TRUE,scale = TRUE)
+
+#Here we have a plot of the variance by principle componant
+plot(prcompTmp)
+
+#This is just a fancy way of doing the same thing
+fviz_eig(prcompTmp, addlabels=TRUE, ylim=c(0,60), geom = c("bar", "line"), barfill = "gold", barcolor="grey",linecolor = "red", ncp=10)+
+labs(title = "Principal Component Analysis of CD8 Δ PD-1",
+         x = "Principal Components", y = "% of variances")
+
+
+all_var <- get_pca_var(prcompTmp)
+all_var
+
+#Correlation between variables and PCA
+#It shows the importance of a principal component for a given observation (vector of original variables). You can go through the following link for details.
+corrplot(all_var$cos2, is.corr=FALSE)
+
+#To highlight the most contributing variables for each components
+corrplot(all_var$contrib, is.corr=FALSE)    
+# 
+
+fviz_pca_var(prcompTmp, col.var = "black")
+
+
+fviz_pca_var(prcompTmp, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE # Avoid text overlapping
+             )
+
+
+
+
+plot(DESeq_results_all_counts$CreN,DESeq_results_all_counts$CreP)
+
+
+value = NULL
+df = NULL
+
+df <- data.frame(treatment=c("Cre-","Cre+"),value=c(model_training_set_3[,8],model_training_set_3[,9]))
+
+supPo=(value+5) +5
+
+
+boxplot(log(df$value.CreN),log(df$value.CreP),col = c("orange","red"),border = "brown",horizontal = TRUE,notch = TRUE, names = c("Cre-","Cre+"),main = "Log Normalized expression values of CD8 Δ PD-1")
+
+a = log(df$value.CreN)
+b = log(df$value.CreP)
+#t.test(model_training_set_3[,8],model_training_set_3[,9])
+
+
+value = NULL
+df = NULL
+
+df <- data.frame(treatment=c("Cre-","Cre+"),value=c(model_training_set_3[,8],model_training_set_3[,9]))
+
+supPo=(value+5) +5
+
+
+boxplot(log(df$value.CreN),log(df$value.CreP),col = c("orange","red"),border = "brown",horizontal = TRUE,notch = TRUE, names = c("Cre-","Cre+"),main = "Log Normalized expression values of CD8 Δ PD-1")
+
+boxplot(log(induc$CreN),log(induc$CreP),col = c("orange","red"),border = "brown",horizontal = TRUE,notch = TRUE, names = c("Cre-","Cre+"),main = "Log Normalized expression values of Tamox Δ PD-1")
+
+induc_data_CorT = log(induc[,2:16])
+multi.hist(induc_data_CorT) 
+multi.hist(induc[,2:16]) 
+
+HD_data_CorT = log(DESeq_results_all_counts[,10:29])
+multi.hist(HD_data_CorT) 
+
+#summary(m1 <- glm(num_awards ~ prog + math, family="poisson", data=p))
+
+trials = glm(df$value.CreN ~ df$value.CreP, family="poisson", data=df)
+summary(trials)
+
+
+crenDensity = density(df$value.CreN)
+crepDensity = density(df$value.CreP)
+plot(crenDensity,ann=FALSE)
+title(main="Density plot of expression values of CD8 Δ PD-1")
+abline(crepDensity)
+polygon(crenDensity,col= rgb(0,0,1,0.8))
+polygon(crepDensity,col= rgb(1,0,0,.8))
+
+
+```
+
+Some preliminary analysis done in this section 
+```{r}
+
+induc <- read_excel("F:/GS/MT/Data/induc_all_counts.xlsx")
+
+
+
+#here we are computing PCA
+dim(DESeq_results_all_counts)
+prcompTmp <- prcomp(induc[,2:18],center = TRUE,scale = TRUE)
+
+#Here we have a plot of the variance by principle componant
+plot(prcompTmp)
+
+#This is just a fancy way of doing the same thing
+fviz_eig(prcompTmp, addlabels=TRUE, ylim=c(0,60), geom = c("bar", "line"), barfill = "gold", barcolor="grey",linecolor = "red", ncp=10)+
+labs(title = "Principal Component Analysis of Tamox Δ PD-1",
+         x = "Principal Components", y = "% of variances")
+
+
+all_var <- get_pca_var(prcompTmp)
+all_var
+
+#Correlation between variables and PCA
+#It shows the importance of a principal component for a given observation (vector of original variables). You can go through the following link for details.
+corrplot(all_var$cos2, is.corr=FALSE)
+
+#To highlight the most contributing variables for each components
+corrplot(all_var$contrib, is.corr=FALSE)    
+# 
+
+fviz_pca_var(prcompTmp, col.var = "black")
+
+
+fviz_pca_var(prcompTmp, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE # Avoid text overlapping
+             )
+
+
+
+
+plot(DESeq_results_all_counts$CreN,DESeq_results_all_counts$CreP)
+
+
+value = NULL
+df = NULL
+
+df <- data.frame(treatment=c("Cre-","Cre+"),value=c(model_training_set_3[,8],model_training_set_3[,9]))
+
+supPo=(value+5) +5
+
+
+boxplot(log(df$value.CreN),log(df$value.CreP),col = c("orange","red"),border = "brown",horizontal = TRUE,notch = TRUE, names = c("Cre-","Cre+"),main = "Log Normalized expression values of CD8 Δ PD-1")
+
+a = log(df$value.CreN)
+b = log(df$value.CreP)
+#t.test(model_training_set_3[,8],model_training_set_3[,9])
+
+
+value = NULL
+df = NULL
+
+df <- data.frame(treatment=c("Cre-","Cre+"),value=c(model_training_set_3[,8],model_training_set_3[,9]))
+
+supPo=(value+5) +5
+
+
+boxplot(log(df$value.CreN),log(df$value.CreP),col = c("orange","red"),border = "brown",horizontal = TRUE,notch = TRUE, names = c("Cre-","Cre+"),main = "Log Normalized expression values of CD8 Δ PD-1")
+
+#boxplot(log(induc$CreNegative),log(induc$CrePositive),col = c("orange","red"),border = "brown",horizontal = TRUE,notch = TRUE, names = c("Cre-","Cre+"),main = "Log Normalized expression values of Tamox Δ PD-1",na.action = na.exclude)
+
+
+perm_table = summary(model_training_set_3)
+inducible_table = summary(induc)
+
+hist(as.numeric(unlist(model_training_set_3[,11:29])),breaks = 500,main = "Histogram of expression values of CD8 Δ PD-1",xlab = "CD8 Δ PD-1")
+
+hist(as.numeric(unlist(induc[,2:18])),breaks = 500,main = "Histogram of expression values of Tamox Δ PD-1",xlab = "Tamox Δ PD-1")
+
+tempD = as.numeric(unlist(induc[,2:18]))
+tempD = as.integer(tempD)
+fit <- fitdistr(tempD, "Poisson")
+
+hist(x.pois, breaks=100,freq=FALSE)
+lines(density(x.pois, bw=0.8), col="red")
+
+plot(0:143267, dpois( x=0:143267, lambda=fit$estimate ), xlim=c(0,143267))
+
+
+corPerm = cor(induc[,2:18],method = "kendall")
+
+#str(as.numeric(model_training_set_3[,11:29]))
+#write.table(perm_table,file = "C:/Users/Alos Diallo/Documents/Perm_deltion.txt",sep="\t")
+#write.table(inducible_table,file = "C:/Users/Alos Diallo/Documents/induc_deltion.txt",sep="\t")
+
+```
+
+
+```{r testerr,warning=FALSE}
+
+
+#model_training_set = NULL
+#model_training_set <- read_excel("/Users/adiallo/Desktop/model/new_approach/training_data.xlsx")
+
+model_training_set = NULL
+model_training_set <- read_excel("/Users/adiallo/Desktop/model/model_training_set.xlsx", 
+     col_types = c("text", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "text"))
+
+nTries = 60
+holder = NULL
+dim(model_training_set)
+
+str(model_training_set)
+#model_training_set = as.matrix(model_training_set)
+model_training_set$CLASS = as.factor(model_training_set$CLASS)
+#Train[,10] = as.numeric(unlist(Train[,10]))
+
+#for ( iTry in 1:nTries ) {
+    Train = NULL
+    Test = NULL
+    bTrain = NULL
+   # bTrain <- sample(rep(c(TRUE,FALSE),length.out=nrow(model_training_set)*.2)) 
+    bTrain = sample(1:nrow(model_training_set),round(0.9*nrow(model_training_set)))
+    Train <- model_training_set[bTrain,1:10]
+    Test <- model_training_set[-bTrain,1:10]
+
+
+# warning=FALSE in knitr clause prevents well understood warnings from cluttering the output
+dfTmp <- NULL
+for ( iResample in 1:2 ) {
+  for ( iSim in 1:100 ) {
+    bTrain = sample(1:nrow(model_training_set),round(0.7*nrow(model_training_set)))
+    Train <- model_training_set[bTrain,1:10]
+    Test <- model_training_set[-bTrain,1:10]
+    if ( iResample == 2 ) {
+      bTrain = sample(1:nrow(model_training_set),round(nrow(model_training_set)),replace=TRUE)
+      Train <- model_training_set[bTrain,1:10]
+      Test <- model_training_set[-bTrain,1:10]
+    }
+    # logistic regression:
+glmTrain <- glm(Train$CLASS~.,data=Train[,2:9],family=binomial)
+    glmTestPred <- predict(glmTrain, newdata=Test[,2:9], type="response") > 0.5
+    tmpVals <- summPreds(as.numeric(glmTestPred)+1,as.numeric(Test$CLASS))
+    dfTmp <- rbind(dfTmp,data.frame(resample=c("Validation","Bootstrap")[iResample],type="LR",metric=names(tmpVals),value=tmpVals))
+    #Neural network
+       nnRes = NULL
+    #The neural network
+    nnRes <- neuralnet(Train$CLASS ~ .,Train[,2:9],hidden=c(10,10,10,10,10,10,10,10,10,10,10,10),stepmax=1e6,err.fct="ce", algorithm = "rprop+", learningrate = 0.0001,linear.output=FALSE,threshold=0.001)
+    tmpXYZpred <- predict(nnRes,Test[,2:9])
+    tmpVals <- summPreds(as.integer(Test$CLASS),tmpXYZpred[,1] < .05)
+    dfTmp <- rbind(dfTmp,data.frame(resample=c("Validation","Bootstrap")[iResample],type="NN",metric=names(tmpVals),value=tmpVals))
+
+    # LDA:
+    ldaTrain <- lda(Train$CLASS~.,data=Train[,2:9])
+    ldaTestPred <- predict(ldaTrain, newdata=Test[,2:9])
+    tmpVals <- summPreds(as.numeric(ldaTestPred$class),as.numeric(Test$CLASS))
+    dfTmp <- rbind(dfTmp,data.frame(resample=c("Validation","Bootstrap")[iResample],type="LDA",metric=names(tmpVals),value=tmpVals))
+    # QDA:
+    qdaTrain <- qda(Train$CLASS~.,data=Train[,2:9])
+    qdaTestPred <- predict(qdaTrain, newdata=Test[,2:9])
+    tmpVals <- summPreds(as.numeric(qdaTestPred$class),as.numeric(Test$CLASS))
+    dfTmp <- rbind(dfTmp,data.frame(resample=c("Validation","Bootstrap")[iResample],type="QDA",metric=names(tmpVals),value=tmpVals))
+    # NB:
+    nbTrain <- naiveBayes(Train$CLASS~.,data=Train[,2:9])
+    nbTestPred <- predict(nbTrain, newdata=Test[,2:9])
+    tmpVals <- summPreds(as.numeric(nbTestPred),as.numeric(Test$CLASS))
+    dfTmp <- rbind(dfTmp,data.frame(resample=c("Validation","Bootstrap")[iResample],type="NB",metric=names(tmpVals),value=tmpVals))
+    # KNN:
+        for ( kTmp in c(10,20,150,300) ) {
+      knnTestPred <- knn(Train[,2:9],Test[,2:9],Train$CLASS,k=kTmp)
+      tmpVals <- summPreds(as.numeric(knnTestPred),as.numeric(Test$CLASS))
+      dfTmp <- rbind(dfTmp,data.frame(resample=c("Validation","Bootstrap")[iResample],type=paste0("K",kTmp),metric=names(tmpVals),value=tmpVals))
+}
+  }
+}
+```
+
+```{r,fig.width=12,fig.height=6}
+
+
+
+p = ggplot(dfTmp,aes(x=type,y=100*value,colour = type)) + geom_boxplot(fill="white") + geom_point() + facet_wrap(~resample+metric,ncol=4,scales="free") + xlab("") + ylab("") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme_bw()
+#png("/Users/adiallo/Desktop/model/test2.png",width = 40,height = 40,units = "in",res= 120,pointsize = 12)
+p
+print(p)
+
+dev.off()
+```
+
+
