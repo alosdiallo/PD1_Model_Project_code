@@ -1,0 +1,104 @@
+Course outline
+
+Nano-course of 6 weeks (if needed more). 
+Pass/Fail course. 
+
+Course philosophy: 
+The idea is for the course to be a friendly, fun and exciting entry point for gaining confidence in data analysis and the application for statistical tools and packages. 
+We would like to give the Immunology PhD students some basis of the statistics behind any data-analysis procedure / package.
+We will construct the course such that students could either expand their statistical / computational knowledge (via e.g. optional HW questions) or just get some basic grasp of the most prevalent statistical concepts if they prefer. 
+
+Lectures: 
+1.5 hours lecture followed by Q&A, once a week. 
+
+R workshops: 
+1.5-2 hours weekly, by Alos
+
+TAs to support for R workshops an homework questions. 
+
+
+Lecture 1 - fundamentals of statistical analysis
+
+— Law of large numbers
+— Central Limit Theorem
+
+Hypothesis testing discussion:
+	— steps for testing statistic. (Can add: parametric and non-parametric)
+	— type I and type II errors. 
+	— power computation. 
+	— the p-value
+
+Confidence interval:
+	
+
+Lecture 2 - fundamentals of statistical analysis 
+
+Different tests to infer the mean. 
+	— t-test (parametric)
+	— Wilcox (non-parametric)
+
+* 2-sample tests, testing for the mean. 
+
+* experiment design
+
+* multiple testing. 
+	— corrections for multiple testing - bonferroni, Benjamini Hochberg. 
+
+
+Lecture 3 - Modeling .  
+
+Data transformation (to make it e.g. gaussian) 
+	— can’t say something about the original data, but can say about the transformed data. 
+	
+Multivariate data
+	— methods for visualizing
+
+Correlation and covariance
+
+Linear regression
+	— parameter estimation by least squares
+	— hypothesis testing
+	— coefficient of determination
+	— checking the assumptions
+
+Training and testing sets. 
+	— discuss overfitting. 
+
+
+Lecture 4 - Modeling and dimensionality reduction:
+
+ANOVA
+	— forward / backward selection
+	
+Covariate interactions
+
+Mixed effect models
+
+PCA
+	— three equivalent definitions
+	— above average variance to keep PCs. 
+
+Just introduce and get a sense for: tSNE, UMAP, Diffusion components and pseudotime. 
+
+
+Lecture 5 - Classification: 
+
+Discriminant analysis - classification. 
+
+Quality of classification
+
+Logistic regression
+
+Classification trees
+	— Overfitting
+	— Impurity measures
+
+Random forests
+
+Cluster analysis
+
+Hierarchical clustering
+
+Lecture 6 – Topics of interest: 
+
+E.g. Deep learning or anything else. 
