@@ -9,5 +9,5 @@ Authors
   
 Copyright © 2018 the President and Fellows of Harvard College.
 
-![Blavatnikimmunology](https://storage.googleapis.com/gencode_ch_data/Blavatnikimmunology.jpg)  
-![EVERGRANDE](https://storage.googleapis.com/gencode_ch_data/evergrande_logo_footer2.png)
+![Blavatnikimmunology](https://github.com/alosdiallo/HMS_Immunology_RNASeq/blob/master/Blavatnikimmunology.jpg)  
+![EVERGRANDE](https://github.com/alosdiallo/HMS_Immunology_RNASeq/blob/master/evergrande_logo_footer2.png)
